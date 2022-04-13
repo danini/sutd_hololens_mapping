@@ -12,8 +12,10 @@ from scipy.spatial.transform import Rotation as R
 
 def camera_id_from_image(db_path, image_id):
     db = colmap_db.COLMAPDatabase.connect(db_path)
-    cam_id = db.execute("SELECT camera_id from images WHERE image_id = ?;", (image_id,))
-    return cam_id.fetchone()[0]
+    cursor = db.execute("SELECT camera_id from images WHERE image_id = ?;", (image_id,))
+    camera_id = cursor.fetchone()[0]
+    db.close()
+    return camera_id
 
 def update_camera(db_path, camera_id, model, width, height, fx, fy, cx, cy):
     db = colmap_db.COLMAPDatabase.connect(db_path)
@@ -26,6 +28,8 @@ def update_camera(db_path, camera_id, model, width, height, fx, fy, cx, cy):
         "params = ? "
         "WHERE camera_id = ?;",
         (model, width, height, colmap_db.array_to_blob(np.array([fx, fy, cx, cy])), camera_id))
+    db.commit()
+    db.close()
 
 def read_keypoints(db_path, image_id):
     db = colmap_db.COLMAPDatabase.connect(db_path)
@@ -33,6 +37,7 @@ def read_keypoints(db_path, image_id):
 
     row = cursor.fetchone()
     keypoints = colmap_db.blob_to_array(row[3], np.float32, (row[1], row[2]))
+    db.close()
     return keypoints
         #     keypoints = np.asarray(keypoints, np.float32)
         # self.execute(
