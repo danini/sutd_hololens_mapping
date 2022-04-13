@@ -84,7 +84,7 @@ def create_reconstruction(recording_path, model_path):
     image_path_list = [str(p.relative_to(images)) for p in map_images]
 
     # TODO: Remove again - just for simpler debugging
-    image_path_list = image_path_list[:3]
+    image_path_list = image_path_list[:100]
     
     ri = [read_image(images / Path(r)) for r in image_path_list[:5]]
     plot_images(ri, dpi=25)
