@@ -139,7 +139,7 @@ def create_reconstruction(recording_path, model_path):
             camera = pycolmap.Camera('PINHOLE', width, height, [fx, fy, cx, cy], camera_id)
 
             # image = pycolmap.Image(os.path.join(recording_path, 'PV', image_name + '.png'), [], R.from_matrix(pose[:3,:3]).as_quat(), pose[:3,3], im_id)
-            image = pycolmap.Image(name = os.path.join(recording_path, 'PV', image_name + '.png'), camera_id = camera_id, id = im_id)
+            image = pycolmap.Image(name = image_name, camera_id = camera_id, id = im_id)
             keypoints = read_keypoints(db_path, im_id)
             kp_list = np.split(keypoints.astype(np.float64), keypoints.shape[0], axis=0)
             image.points2D = pycolmap.ListPoint2D([pycolmap.Point2D(np.transpose(p)) for p in kp_list])
