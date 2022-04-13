@@ -1,0 +1,8 @@
+# vscode data
+.vscode
+
+# Generated python stuff
+__pycache__/
+
+# Virtual python environment
+venv/
