@@ -145,9 +145,10 @@ def create_reconstruction(recording_path, model_path):
             image.points2D = pycolmap.ListPoint2D([pycolmap.Point2D(np.transpose(p)) for p in kp_list])
             # image.name = os.path.join(recording_path, 'PV', image_name + '.png')
             # image.camera_id = im_id
-            image.qvec = R.from_matrix(pose[:3,:3]).inv().as_quat()
-            image.tvec = -R.from_matrix(pose[:3,:3]).inv().as_matrix() @ pose[:3,3]
-
+            quat = R.from_matrix(image2world[:3,:3]).inv().as_quat()
+            # Pycolmap expects the real part of the quaternion in the first position
+            image.qvec = np.roll(quat, 1)
+            image.tvec = -R.from_matrix(image2world[:3,:3]).inv().as_matrix() @ image2world[:3,3]
 
             reconstruction.add_camera(camera)
             reconstruction.add_image(image, check_not_registered=True)
