@@ -3,6 +3,8 @@ import numpy as np
 import os
 import pycolmap
 
+import matplotlib.pyplot as plt
+
 from colmap import database as colmap_db
 from hloc import extract_features, match_features, visualization, pairs_from_exhaustive
 from hloc import reconstruction as hloc_reconstruction
@@ -71,23 +73,18 @@ def create_reconstruction(recording_path, model_path):
 
     outputs = Path('/tmp/outputs/demo/')
     sfm_pairs = outputs / 'pairs-sfm.txt'
-    loc_pairs = outputs / 'pairs-loc.txt'
-    sfm_dir = outputs / 'sfm'
     features = outputs / 'features.h5'
     matches = outputs / 'matches.h5'
 
-    feature_conf = extract_features.confs['superpoint_aachen']
-    matcher_conf = match_features.confs['superglue']
+    feature_conf = extract_features.confs['superpoint_inloc']
+    matcher_conf = match_features.confs['superglue-fast']
 
     map_images = images.glob('*.png')
     
     image_path_list = [str(p.relative_to(images)) for p in map_images]
 
     # TODO: Remove again - just for simpler debugging
-    image_path_list = image_path_list[:100]
-    
-    ri = [read_image(images / Path(r)) for r in image_path_list[:5]]
-    plot_images(ri, dpi=25)
+    # image_path_list = image_path_list[:200]
 
     pycolmap.import_images(db_path, pv_path, pycolmap.CameraMode.PER_IMAGE, 'PINHOLE', image_path_list)
 
@@ -98,17 +95,23 @@ def create_reconstruction(recording_path, model_path):
     image_ids = hloc_reconstruction.get_image_ids(db_path)
     hloc_reconstruction.import_features(image_ids, db_path, features)
     hloc_reconstruction.import_matches(image_ids, db_path, sfm_pairs, matches, min_match_score=None, skip_geometric_verification=False)
+    hloc_reconstruction.geometric_verification(db_path, sfm_pairs)
 
     # Read the image poses and focal lengths
     pv_file_path = list(Path(recording_path).glob('*pv.txt'))
     assert len(list(pv_file_path)) == 1
     pv_file_path = pv_file_path[0]
 
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+
     with open(pv_file_path) as f:
         lines = f.readlines()
         static_params = lines[0].split(",")
         cx, cy = [float(x) for x in static_params[:2]]
         width, height = [int(x) for x in static_params[2:]]
+
+        image_positions = np.zeros((len(lines)-1, 3), dtype=np.float32)
         
 
         for line_idx, line in enumerate(lines[1:]):
@@ -121,13 +124,26 @@ def create_reconstruction(recording_path, model_path):
                 continue
 
             fx, fy = [float(x) for x in vals[1:3]]
-            pose = np.array([float(x) for x in vals[3:]])
-            pose = pose.reshape((4,4))
+            cam2world = np.array([float(x) for x in vals[3:]])
+            cam2world = cam2world.reshape((4,4))
+
+            # Hololens uses a different coordinate system than colmap.
+            # The Z-axis is flipped, meaning forward direction is negative Z,
+            # and Y is pointing upwards.
+            image2cam = np.array([
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0, 0.0],
+                [0.0, 0.0, -1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0]
+            ])
+
+            image2world = cam2world @ image2cam
+
+            image_positions[line_idx] = image2world[:3,3]
+
             # image_name, fx, fy, pose = line.split(",")
             print(f"Image name: {image_name}")
-            print(f"Image pose: {pose}")
-
-
+            print(f"Image pose: {image2world}")
 
             im_id = image_ids[image_name]
 
@@ -156,10 +172,16 @@ def create_reconstruction(recording_path, model_path):
 
             print(f"Num images: {reconstruction.num_images()}")
 
+        ax.scatter3D(image_positions[:,0], image_positions[:,1], image_positions[:,2])
 
+        ax.set_xlim([0,25])
+        ax.set_ylim([0,25])
+        ax.set_zlim([0,25])
+        plt.show()
 
+    pycolmap.triangulate_points(reconstruction, db_path, images, str(model_path))
     
-    reconstruction.write_text(str(model_path))
+    # reconstruction.write_text(str(model_path))
     
 
 
