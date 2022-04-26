@@ -56,9 +56,11 @@ def add_grayscale_images(reconstruction, camera_name, image_base_path, db_path, 
     sanitized_camera_name = camera_name.replace(' ', '_')
     image_path = image_base_path / sanitized_camera_name
 
+    # TODO: This actually returns false if the symlink exists but points to an invalid path
     if image_path.exists():
         assert(image_path.is_symlink())
-        assert(image_path.resolve(strict=True) == image_data_path)
+        # Make sure we also capture symlinks in image_data_path
+        assert(image_path.resolve(strict=True) == image_data_path.resolve(strict=True))
     else:
         image_path.symlink_to(image_data_path, target_is_directory=True)
 
@@ -109,7 +111,10 @@ def add_grayscale_images(reconstruction, camera_name, image_base_path, db_path, 
 
         timestamp = float(image_name[len(ts_prefix):-len(ts_suffix)])
 
-        assert(timestamp in rig2world_transforms)
+        # Apparently this happens (rarely)
+        if not timestamp in rig2world_transforms:
+            print(f"Error - could not find timestamp {timestamp} in rig poses (rig2world).")
+            continue
 
         rig2world = rig2world_transforms[timestamp]
 
@@ -141,9 +146,13 @@ def image_preprocessing(image_name_list, image_base_path, db_path, feature_conf,
 
     pycolmap.import_images(db_path, image_base_path, pycolmap.CameraMode.PER_IMAGE, 'PINHOLE', image_name_list)
 
+    # TODO: This currently only matches the images of the current camera.
     extract_features.main(feature_conf, image_base_path, image_list=image_name_list, feature_path=tmp_features_path)
+    # This matches all images of the current camera to each other
     pairs_from_exhaustive.main(tmp_sfm_pairs_path, image_list=image_name_list)
     match_features.main(matcher_conf, tmp_sfm_pairs_path, features=tmp_features_path, matches=tmp_matches_path)
+    # TODO Add matches against other cameras' images
+    # pairs_from_exhaustive.main(tmp_sfm_pairs_path, image_list=image_name_list, ref_list=TODO, ref_features=TODO)
 
     image_ids = hloc_reconstruction.get_image_ids(db_path)
 
@@ -152,12 +161,13 @@ def image_preprocessing(image_name_list, image_base_path, db_path, feature_conf,
 
     hloc_reconstruction.import_features(new_image_ids, db_path, tmp_features_path)
     hloc_reconstruction.import_matches(new_image_ids, db_path, tmp_sfm_pairs_path, tmp_matches_path, min_match_score=None, skip_geometric_verification=False)
+    # TODO: Do we need this if we already do not skip geometric verification in import_matches?
     hloc_reconstruction.geometric_verification(db_path, tmp_sfm_pairs_path)
 
     # Remove all the files for now to awoid potential bugs
-    tmp_sfm_pairs_path.unlink()
-    tmp_features_path.unlink()
-    tmp_matches_path.unlink()
+    # tmp_sfm_pairs_path.unlink()
+    # tmp_features_path.unlink()
+    # tmp_matches_path.unlink()
     # tmp_output_dir.rmdir()
 
     return new_image_ids
