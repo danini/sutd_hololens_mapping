@@ -227,41 +227,6 @@ def get_pv_cam_images(pv_file_path, image_base_path):
     return image_names, image_poses, image_calibs
 
 
-def image_preprocessing(image_ids, image_base_path, db_path, feature_conf, matcher_conf):
-
-    # TODO: This assumes a linux filesystem
-    # There is a Python 'tempfile' module that could make it cross-platform
-    tmp_output_dir = Path('/tmp/hololens_mapping')
-    tmp_output_dir.mkdir(exist_ok=True)
-    tmp_sfm_pairs_path = tmp_output_dir / 'pairs-sfm.txt'
-    tmp_features_path = tmp_output_dir / 'features.h5'
-    tmp_matches_path = tmp_output_dir / 'matches.h5'
-
-    image_name_list = image_ids.keys()
-
-    extract_features.main(feature_conf, image_base_path, image_list=image_name_list, feature_path=tmp_features_path)
-    pairs_from_exhaustive.main(tmp_sfm_pairs_path, image_list=image_name_list)
-    match_features.main(matcher_conf, tmp_sfm_pairs_path, features=tmp_features_path, matches=tmp_matches_path)
-
-    # Make sure to only import the new data
-    new_image_ids = {name:id for name, id in image_ids.items() if name in image_name_list}
-
-    hloc_reconstruction.import_features(new_image_ids, db_path, tmp_features_path)
-    # skip_geometric_reconstruction just writes the raw matches into the TwoViewGeometry table.
-    # That's not what we want
-    hloc_reconstruction.import_matches(new_image_ids, db_path, tmp_sfm_pairs_path, tmp_matches_path, min_match_score=None, skip_geometric_verification=False)
-    # Actually estimate two view geometries and verify matches
-    # There is a pull request in hloc to do this with the given poses as prior (possible improvement)
-    hloc_reconstruction.geometric_verification(db_path, tmp_sfm_pairs_path)
-
-    # Remove all the files for now to awoid potential bugs
-    tmp_sfm_pairs_path.unlink()
-    tmp_features_path.unlink()
-    tmp_matches_path.unlink()
-    # tmp_output_dir.rmdir()
-
-    return new_image_ids
-
 def register_image(image_id, reconstruction, db_path, image2world):
     camera_id = camera_id_from_image(db_path, image_id)
 
