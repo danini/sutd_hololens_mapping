@@ -288,10 +288,12 @@ def create_reconstruction(recording_path, model_path):
     all_image_names = []
     all_cam_calibs = []
     for _, image_data in cam_images.items():
-        # TODO: Only use a few images per cam for debugging, remove again
-        num_cam_imgs = 50
-        all_image_names += image_data[0][:num_cam_imgs]
-        all_cam_calibs += image_data[2][:num_cam_imgs]
+        # # TODO: Only use a few images per cam for debugging, remove again
+        # num_cam_imgs = 50
+        # all_image_names += image_data[0][:num_cam_imgs]
+        # all_cam_calibs += image_data[2][:num_cam_imgs]
+        all_image_names += image_data[0]
+        all_cam_calibs += image_data[2]
 
     pycolmap.import_images(db_path, recording_path, pycolmap.CameraMode.PER_IMAGE, 'PINHOLE', all_image_names)
     image_ids = hloc_reconstruction.get_image_ids(db_path)
