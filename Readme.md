@@ -20,3 +20,10 @@ The mapping code assumes Python >=3.7
 1. Run the `colmap image_undistorter`
 1. Run the `colmap patch_match_stereo` (`--PatchMatchStereo.geom_consistency false` seems to work better)
 1. Run `colmap stereo_fusion`
+
+
+# Sparse mapping overview
+The script `create_colmap_reconstruction.py` automatically creates a sparse COLMAP reconstruction based on the RGB and grayscale images recorded by hololens.
+It uses the reported image poses as priors to initialize the reconstruction, but optimizes the poses in a BA step afterwards.
+The script extracts Superpoint features, and determines image pairs to be matched with Superglue based on overlapping frustrums according to the prior poses (TODO: Either rotate all GS images upright and adapt the poses accordingly or switch to different, rotation invariant features -> far right/left cameras are not just rotated in 90deg steps, so rotation invariance might actually lead to more matches).
+After triangulating points from the images with prior poses, we perform multiple iterations of bundle adjustment (while keeping the intrinsic camera parameters fixed), filtering, and retriangulation.
